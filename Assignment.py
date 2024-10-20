@@ -198,8 +198,8 @@ class dynmodel:
         convH2 = 100000*(self.mwH2/(self.R*353)) # bar to hydrogen density
         convO2 = 100000*(self.mwO2/(self.R*353)) # bar to oxygen density
         if t<(100*60):
-            p_setH2 = 2*convH2 # 1 bar
-            p_setO2 = 2*convO2 # 1 bar
+            p_setH2 = 2*convH2 # 2 bar
+            p_setO2 = 2*convO2 # 2 bar
         else:
             p_setH2 = 2.50*convH2
             p_setO2 = 2.50*convO2
@@ -287,8 +287,8 @@ class dynmodel:
             C2 = self.Kc_pO2*(error2+1/self.pO2_tau_i*I2) # m^3/s 
             F5 = C1
             F6 = C2
-            dpH2dt = ((self.F3_H2t(self.Ept(t)))-F5)/self.V1_gas
-            dpO2dt = ((self.F4_O2t(self.Ept(t)))-F6)/self.V2_gas
+            dpH2dt = ((self.F3_H2t(self.Ept(t)))-F5)/self.V1_gas # gas setpoint increase good, density increase bad
+            dpO2dt = ((self.F4_O2t(self.Ept(t)))-F6)/self.V2_gas 
             dI1dt = error1
             dI2dt = error2
             dT1dt = (self.TCA_SP-T1)/60 # T1
