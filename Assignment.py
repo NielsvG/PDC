@@ -352,7 +352,7 @@ class dynmodel:
         # Question 10 (let op kijk ook naar T0)
             C = self.T_set(0) + self.KcT1*(error+1/tau_i*I) # TCA_SP
             dT1dt = (C-T1)/60
-            dT3dt = (self.F1_elec+self.F2_elec+(self.Ept(t)-100)*(31/400))*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(t)/self.Cs1
+            dT3dt = (self.F1_elec+self.F2_elec+(self.Ept(t)-100)*(7.5/400))*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(t)/self.Cs1
 
             dIdt = error
             # if t>=0 and t < 245:
@@ -421,8 +421,8 @@ class dynmodel:
         # print("\nSS")
         # print(0.63*(self.res[:,1][-1]-self.SS.T3)+self.SS.T3)
 
-        ax3.plot(self.t_arr/60, self.res[:,2], label = r'$\rho$'+'H2')
-        ax3.plot(self.t_arr/60, self.res[:,3], label = r'$\rho$'+'O2')
+        ax3.plot(self.t_arr/60, self.res[:,2], label = r'$\Delta\rho$'+'H2')
+        ax3.plot(self.t_arr/60, self.res[:,3], label = r'$\Delta\rho$'+'O2')
         ax3.set_xlabel("Time (min)")
         ax3.set_ylabel("Density ($kg/m^{3}$)")
         #ax3.set_title("Density of hydrogen and oxygen over time")
@@ -579,7 +579,11 @@ class dynmodel:
 
         # Step test
         # ax2.plot(self.t_arr[2450:]/60, self.res[2450:,1]-273.15, label='T3')
-        # ax2.text(0,self.SS.T3,"{:.0f}".format(self.SS.T3))
+        # ax2.axhline(self.SS.T3-273.15, color='black', label=f'Steady state T3 ({self.SS.T3-273.15:.2f} $\degree$C) for EP=100')
+        # ax2.axhline(self.SS.T3-273.15+1, color='black', label=f'Max T3 ({self.SS.T3-273.15+1:.2f} $\degree$C) after step change')
+        # ax2.plot(self.t_arr[2500:2600]/60, (((self.res[3000,1]-self.res[2500,1])/((500*tf/Nt)/60))*((self.t_arr[2500:2600]-self.t_arr[2500])/60)+self.SS.T3-273.15))
+        # ax2.axvline(600, color='black', ls='--', label='Tangent at 65% of steady state value')
+        # # ax2.text(0,self.SS.T3,"{:.0f}".format(self.SS.T3))
         # ax2.set_xlabel("Time (min)")
         # ax2.set_ylabel("Temperature (C)")
         # ax2.legend()
@@ -606,7 +610,7 @@ class dynmodel:
         ax4.legend()
         plt.show(block=False)
 
-        F1_array = np.ones(self.t_arr.size)*(self.SS.F1_elec+self.SS.F2_elec+(EP_array-100)*(31/400))/2
+        F1_array = np.ones(self.t_arr.size)*(self.SS.F1_elec+self.SS.F2_elec+(EP_array-100)*(7.5/400))/2
         ax5.plot(self.t_arr/60, F1_array, label = '$F1_{elec}$')
         ax5.set_xlabel("Time (min)")
         ax5.set_ylabel("Flow (kg/s)")
@@ -645,9 +649,9 @@ Results not yet calculated.
 # print(S1)
 
 # Uncomment to calculate and plot dynamic simulation (Question 7)
-S2 = dynmodel()
-S2.plot_calcgraphs(5000, 200)
-plt.show()
+# S2 = dynmodel()
+# S2.plot_calcgraphs(5000, 200)
+# plt.show()
 
 # Uncomment to calculate and plot dynamic simulation with PI controllers for PC1 and PC2 (Question 8)
 # S2 = dynmodel()
@@ -655,8 +659,8 @@ plt.show()
 # plt.show()
 
 # Uncomment to calculate and plot dynamic simulation with PI controller for TC1 (Question 9)
-# S2 = dynmodel()
-# S2.plot_PIDgraphs_t(5000, 200) 
-# plt.show()
+S2 = dynmodel()
+S2.plot_PIDgraphs_t(5000, 200) 
+plt.show()
 
 
