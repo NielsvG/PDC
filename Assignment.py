@@ -293,10 +293,10 @@ class dynmodel:
             dI2dt = error2
             dT1dt = (self.TCA_SP-T1)/60 # T1
             dT3dt = (self.SS.F1_elec+self.SS.F2_elec)*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(t)/self.Cs1 # T3
-            if F5 < 0:
-                print(F5)
-            if (-(dpH2dt)*self.V1_gas+self.p2*self.Ept(t)) < 0:
-                print(-(dpH2dt)*self.V1_gas+self.p2*self.Ept(t))
+            # if F5 < 0:
+            #     print(F5)
+            # if (-(dpH2dt)*self.V1_gas+self.p2*self.Ept(t)) < 0:
+            #     print(-(dpH2dt)*self.V1_gas+self.p2*self.Ept(t))
             return np.array([dpH2dt,dpO2dt,dI1dt,dI2dt,dT1dt,dT3dt])
         
         res0 = [self.p_set(0)[0],self.p_set(0)[1],0,0,self.SS.T1,self.SS.T3]
@@ -636,13 +636,13 @@ Results not yet calculated.
 # plt.show()
 
 # Uncomment to calculate and plot dynamic simulation with PI controllers for PC1 and PC2 (Question 8)
-S2 = dynmodel()
-S2.plot_PIDgraphs_p(1000,200)
-plt.show()
+# S2 = dynmodel()
+# S2.plot_PIDgraphs_p(1000,200)
+# plt.show()
 
 # Uncomment to calculate and plot dynamic simulation with PI controller for TC1 (Question 9)
-# S2 = dynmodel()
-# S2.plot_PIDgraphs_t()
-# plt.show()
+S2 = dynmodel()
+S2.plot_PIDgraphs_t()
+plt.show()
 
 
