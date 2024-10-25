@@ -120,22 +120,22 @@ F2_elec={self.F2_elec}   2       2       kg/s
 TCA_SP={self.TCA_SP-273.15} 70      70      C
 
 Results  
-F3_elec = {self.F3_elec:.3g}
-F3_H2 = {self.F3_H2:.3g}
-F_OH = {self.F_OH:.3g}
-F4_elec = {self.F4_elec:.3g}
-F4_O2 = {self.F4_O2:.3g}
-F5 = {self.F5:.3g}
-F6 = {self.F6:.3g}
-F7_elec = {self.F7_elec:.3g}
-F8_elec = {self.F8_elec:.3g}
+F3_elec = {self.F3_elec:.5g}
+F3_H2 = {self.F3_H2:.5g}
+F_OH = {self.F_OH:.5g}
+F4_elec = {self.F4_elec:.5g}
+F4_O2 = {self.F4_O2:.5g}
+F5 = {self.F5:.5g}
+F6 = {self.F6:.5g}
+F7_elec = {self.F7_elec:.5g}
+F8_elec = {self.F8_elec:.5g}
 F9 = {self.F9:.5g}
 rho_H2 = unknown
 rho_O2 = unknown
-T1 = {self.T1-273.15:.3g}
-T2 = {self.T2-273.15:.3g}
-T3 = {self.T3-273.15:.3g}
-T4 = {self.T4-273.15:.3g}
+T1 = {self.T1-273.15:.5g}
+T2 = {self.T2-273.15:.5g}
+T3 = {self.T3-273.15:.5g}
+T4 = {self.T4-273.15:.5g}
 '''
         elif self.calc==0:
             return f'''
@@ -194,15 +194,24 @@ class dynmodel:
         elif t >= (140*60):
             return 100
         
-    def p_set(self, t):
-        convH2 = 100000*(self.mwH2/(self.R*353)) # bar to hydrogen density
-        convO2 = 100000*(self.mwO2/(self.R*353)) # bar to oxygen density
-        if t<(100*60):
+    def p_set(self, t, T3):
+        convH2 = 100000*(self.mwH2/(self.R*T3)) # bar to hydrogen density
+        convO2 = 100000*(self.mwO2/(self.R*T3)) # bar to oxygen density
+        if t<(10000):
             p_setH2 = 2*convH2 # 2 bar
             p_setO2 = 2*convO2 # 2 bar
-        else:
+        elif t<(10400):
             p_setH2 = 2.50*convH2
             p_setO2 = 2.50*convO2
+        elif t<(10800):
+            p_setH2 = 2.25*convH2
+            p_setO2 = 2.25*convO2
+        elif t<11200:
+            p_setH2 = 1.8*convH2
+            p_setO2 = 1.8*convO2
+        else:
+            p_setH2 = 2*convH2 # 2 bar
+            p_setO2 = 2*convO2 # 2 bar
         return [p_setH2, p_setO2]
 
     def F3_H2t(self, EP):
@@ -273,7 +282,7 @@ class dynmodel:
         self.t_arr = np.linspace(0,tf*60,Nt)
         self.pH2_Kp = -10 #m^-3
         self.pO2_Kp = -10 #m^-3
-        self.lmb = 100 #just chose, higher for slower systems. Probably in seconds.
+        self.lmb = 50 #just chose, higher for slower systems. Probably in seconds.
         self.pH2_tau_i = 2*self.lmb
         self.pO2_tau_i= 2*self.lmb
         self.Kc_pH2 = 2/(self.pH2_Kp*self.lmb) # m^3/s
@@ -281,25 +290,27 @@ class dynmodel:
 
         def eq(u,t): #u = [PH2, PO2, I1, I2, T1, T3]
             pH2, pO2, I1, I2, T1, T3 = u
-            error1 = self.p_set(t)[0]-pH2 # error H2
-            error2 = self.p_set(t)[1]-pO2 # error O2
+            error1 = self.p_set(t, T3)[0]-pH2 # error H2
+            error2 = self.p_set(t, T3)[1]-pO2 # error O2
+
             C1 = self.Kc_pH2*(error1+1/self.pH2_tau_i*I1) # m^3/s * error in density
             C2 = self.Kc_pO2*(error2+1/self.pO2_tau_i*I2) # m^3/s 
+
             F5 = self.SS.F5 + C1
             F6 = self.SS.F6 + C2
+
             dpH2dt = (self.F3_H2t(self.Ept(t))-F5)/self.V1_gas
             dpO2dt = (self.F4_O2t(self.Ept(t))-F6)/self.V2_gas
+
             dI1dt = error1
             dI2dt = error2
+
             dT1dt = (self.TCA_SP-T1)/60 # T1
             dT3dt = (self.SS.F1_elec+self.SS.F2_elec)*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(t)/self.Cs1 # T3
-            # if F5 < 0:
-            #     print(F5)
-            # if (-(dpH2dt)*self.V1_gas+self.p2*self.Ept(t)) < 0:
-            #     print(-(dpH2dt)*self.V1_gas+self.p2*self.Ept(t))
+
             return np.array([dpH2dt,dpO2dt,dI1dt,dI2dt,dT1dt,dT3dt])
         
-        res0 = [self.p_set(0)[0],self.p_set(0)[1],0,0,self.SS.T1,self.SS.T3]
+        res0 = [self.p_set(0, self.SS.T3)[0],self.p_set(0, self.SS.T3)[1],0,0,self.SS.T1,self.SS.T3]
 
         self.res = scipy.integrate.odeint(eq, res0, self.t_arr)
 
@@ -309,10 +320,14 @@ class dynmodel:
         return self.res
     
     def T_set(self, t):
-        if t<100*60:
+        if t<(10000):
             T_setT1 = 80 + 273.15
+        elif t<(10800):
+            T_setT1 = 79 + 273.15
+        elif t<11600:
+            T_setT1 = 79.5 + 273.15
         else:
-            T_setT1 = 78 + 273.15
+            T_setT1 = 80 + 273.15
         return T_setT1
     
     def PID2(self, Nt: int = 1000, tf: float = 200):
@@ -326,13 +341,19 @@ class dynmodel:
         def eq3(u,t): #u = [T1, T3, I1]
             T1, T3, I = u
             error = self.T_set(t) - T3
-            #C = self.SS.T1 + self.KcT1*(error+1/tau_i*I) # TCA_SP
+        # Step test (let op kijk ook naar T0)
+            # C = self.TCA_SPt(t)
+            # dT1dt = (C-T1)/60
+            # dT3dt = (self.SS.F1_elec+self.SS.F2_elec)*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(0)/self.Cs1
+        # Question 9 (let op kijk ook naar T0)
+            # C = self.SS.T1 + self.KcT1*(error+1/tau_i*I) # TCA_SP
+            # dT1dt = (C-T1)/60
+            # dT3dt = (self.SS.F1_elec+self.SS.F2_elec)*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(t)/self.Cs1
+        # Question 10 (let op kijk ook naar T0)
             C = self.T_set(0) + self.KcT1*(error+1/tau_i*I) # TCA_SP
             dT1dt = (C-T1)/60
-            # Question 9
-            # dT3dt = (self.SS.F1_elec+self.SS.F2_elec)*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(t)/self.Cs1
-            # Question 10
             dT3dt = (self.F1_elec+self.F2_elec+(self.Ept(t)-100)*(31/400))*self.Cp_elec*(T1-T3)/self.Cs1 + self.p4*self.Ept(t)/self.Cs1
+
             dIdt = error
             # if t>=0 and t < 245:
             #    print(f'At t: {t:.2f} s, SP = {self.T_set(t):.2f}, T3 = {T3:.2f}, T1 = {T1:.2f}, error = {error:.2f}, Total error = {I:.2f}, C = {C:.2f}, dT1dt = {dT1dt:.2f} and dT3dt = {dT3dt:.2f}')
@@ -341,8 +362,15 @@ class dynmodel:
         def eq3_ivp(t,u):
             return eq3(u,t)
 
-        #T0 = np.array([self.SS.T1, self.SS.T3, self.T_set(0)-self.SS.T3])
+        # step test
+        # T0 = np.array([self.SS.T1, self.SS.T3, 0])
+
+        # Q9
+        # T0 = np.array([self.SS.T1, self.SS.T3, self.T_set(0)-self.SS.T3])
+
+        #Q10
         T0 = np.array([self.T_set(0), self.T_set(0), 0])
+
         self.res = scipy.integrate.odeint(eq3, T0, self.t_arr)
         #self.resivp = scipy.integrate.solve_ivp(eq3_ivp, [0,tf*60], T0, t_eval=self.t_arr)
 
@@ -370,12 +398,12 @@ class dynmodel:
             EP_array[i] = self.Ept(self.t_arr[i])
         ax1.plot(self.t_arr/60, EP_array, label = 'EP')
         ax1.set_xlabel("Time (min)")
-        ax1.set_ylabel("Electrical Power (EP)")
+        ax1.set_ylabel("Electrical Power (kW)")
         #ax1.set_title("Electrical Power over Time")
         plt.show(block=False)
 
-        ax2.plot(self.t_arr/60, self.res[:,0]-273.15, label = 'TC1')
-        ax2.plot(self.t_arr/60, self.res[:,1]-273.15, label = 'TC3')
+        ax2.plot(self.t_arr/60, self.res[:,0]-273.15, label = 'T1')
+        ax2.plot(self.t_arr/60, self.res[:,1]-273.15, label = 'T3')
         #ax2.plot(self.t_arr[35:]/60, self.res[:,1][35:]-self.SS.T3, label = 'TC3 above SS value') # step test
         ax2.set_xlabel("Time (min)")
         ax2.set_ylabel("Temperature (C)")
@@ -393,24 +421,24 @@ class dynmodel:
         # print("\nSS")
         # print(0.63*(self.res[:,1][-1]-self.SS.T3)+self.SS.T3)
 
-        ax3.plot(self.t_arr/60, self.res[:,2], label = 'rho H2')
-        ax3.plot(self.t_arr/60, self.res[:,3], label = 'rho O2')
+        ax3.plot(self.t_arr/60, self.res[:,2], label = r'$\rho$'+'H2')
+        ax3.plot(self.t_arr/60, self.res[:,3], label = r'$\rho$'+'O2')
         ax3.set_xlabel("Time (min)")
-        ax3.set_ylabel("rho (kg/m^3)")
+        ax3.set_ylabel("Density ($kg/m^{3}$)")
         #ax3.set_title("Density of hydrogen and oxygen over time")
         ax3.legend()
         plt.show(block=False)
         #print((self.res[:,2][90]-self.res[:,2][70])/(self.t_arr[90]-self.t_arr[70]))
 
         ax4.plot(self.t_arr/60, self.SS.F5*np.ones(self.t_arr.size), label = 'F5')
-        ax4.plot(self.t_arr/60, self.F3_H2t(EP_array), label = 'F3_H2')
+        ax4.plot(self.t_arr/60, self.F3_H2t(EP_array), label = '$F3_{H2}$')
         ax4.set_xlabel("Time (min)")
         ax4.set_ylabel("Flow (kg/s)")
         #ax4.set_title("Flow in F5 and F3_H2 over time")
         ax4.legend()
         plt.show(block=False)
 
-    def plot_PIDgraphs_p(self, Nt: int = 10000, tf: float = 200):
+    def plot_PIDgraphs_p(self, Nt, tf):
         
         if self.pidr == 0:
             print("PID not yet calculated. Please take a break for a moment")
@@ -438,38 +466,45 @@ class dynmodel:
             EP_array[i] = self.Ept(self.t_arr[i])
         ax1.plot(self.t_arr/60, EP_array, label = 'EP')
         ax1.set_xlabel("Time (min)")
-        ax1.set_ylabel("EP")
-        ax1.set_title("EP")
+        ax1.set_ylabel("Electrical power (kW)")
+        # ax1.set_title("EP")
         ax1.legend()
         plt.show(block=False)
 
         ax2.plot(self.t_arr/60, self.res[:,4]-273.15, label = 'T1')
         ax2.plot(self.t_arr/60, self.res[:,5]-273.15, label = 'T3')
-        ax2.set_title("Temperature of TC1 and TC3 over time")
+        # ax2.set_title("Temperature of TC1 and TC3 over time")
         ax2.set_xlabel("Time (min)")
-        ax2.set_ylabel("Temperature (K)")
+        ax2.set_ylabel("Temperature (C)")
         ax2.legend()
         plt.show(block=False)
 
-        pH2_array = np.zeros(self.t_arr.size)
-        pO2_array = np.zeros(self.t_arr.size)
-        print(self.t_arr.size)
+        PH2SP_array = np.zeros(self.t_arr.size)
+        PO2SP_array = np.zeros(self.t_arr.size)
+        PH2PV_array = np.zeros(self.t_arr.size)
+        PO2PV_array = np.zeros(self.t_arr.size)
         for i in range(0,self.t_arr.size):
-            pH2_array[i], pO2_array[i] = self.p_set(self.t_arr[i])
-        ax3.plot(self.t_arr/60, pH2_array*(self.R*353/self.mwH2)/100000, label = 'PC1.SP')
-        ax3.plot(self.t_arr/60, self.res[:,0]*(self.R*353/self.mwH2)/100000, label = 'PC1.PV')
+            T3 = self.res[i,5]
+            pH2, pO2 = self.p_set(self.t_arr[i], T3)
+            PH2SP_array[i] = pH2*(self.R*T3/self.mwH2)/100000
+            PO2SP_array[i] = pO2*(self.R*T3/self.mwO2)/100000
+            PH2PV_array[i] = self.res[i,0]*(self.R*T3/self.mwH2)/100000
+            PO2PV_array[i] = self.res[i,1]*(self.R*T3/self.mwO2)/100000
+
+        ax3.plot(self.t_arr/60, PH2SP_array, label = 'PC1.SP')
+        ax3.plot(self.t_arr/60, PH2PV_array, label = 'PC1.PV')
         ax3.set_xlabel("Time (min)")
         ax3.set_ylabel("Hydrogen pressure (bar)")
-        ax3.set_title("Hydrogen pressure over Time")
+        # ax3.set_title("Hydrogen pressure over Time")
         ax3.legend()
         plt.show(block=False)
         # print(str(np.min(self.res[:,0]))+ ' ' + str(np.max(self.res[:,0])))
 
-        ax4.plot(self.t_arr/60, pO2_array*(self.R*353/self.mwO2), label = 'PC2.SP')
-        ax4.plot(self.t_arr/60, self.res[:,1]*(self.R*353/self.mwO2), label = 'PC2.PV')
+        ax4.plot(self.t_arr/60, PO2SP_array, label = 'PC2.SP')
+        ax4.plot(self.t_arr/60, PO2PV_array, label = 'PC2.PV')
         ax4.set_xlabel("Time (min)")
-        ax4.set_ylabel("Oxygen pressure (Pa)")
-        ax4.set_title("Oxygen pressure over time")
+        ax4.set_ylabel("Oxygen pressure (bar)")
+        # ax4.set_title("Oxygen pressure over time")
         ax4.legend()
         plt.show(block=False)
 
@@ -478,55 +513,35 @@ class dynmodel:
         FI_array = np.zeros(self.t_arr.size)
         for i in range(0,self.t_arr.size-1):
             F5_array[i] = -self.V1_gas*(self.res[:,0][i+1]-self.res[:,0][i])/(self.t_arr[-1]/self.t_arr.size)+self.F3_H2t(self.Ept(self.t_arr[i]))
-            # F5_array[i] = -self.V1_gas*(self.res[:,0][i+1]-self.res[:,0][i])/(self.t_arr[-1]/self.t_arr.size)+self.F3_H2t(self.Ept(t))
             F6_array[i] = -self.V1_gas*(self.res[:,1][i+1]-self.res[:,1][i])/(self.t_arr[-1]/self.t_arr.size)+self.p3*self.Ept(self.t_arr[i])
             FI_array[i] = self.res[:,2][i+1]-self.res[:,2][i]
 
         ax5.plot(self.t_arr[0:-1]/60, F5_array, label = 'F5')
-        ax5.plot(self.t_arr/60, self.F3_H2t(EP_array), label = 'F3_H2')
+        ax5.plot(self.t_arr/60, self.F3_H2t(EP_array), label = '$F3_{H2}$')
         # ax5.plot(self.t_arr/60, np.ones(self.t_arr.size)*self.F3_H2t(self.Ept(0)), label = 'F3_H2')
         ax5.set_xlabel("Time (min)")
         ax5.set_ylabel("Flow (kg/s)")
-        ax5.set_title("Flow in F5 and F3_H2 over time")
+        # ax5.set_title("Flow in F5 and F3_H2 over time")
         ax5.legend()
         plt.show(block=False)
 
         ax6.plot(self.t_arr[0:-1]/60, F6_array, label = 'F6')
-        ax6.plot(self.t_arr/60, self.F4_O2t(EP_array), label = 'F4_O2')
+        ax6.plot(self.t_arr/60, self.F4_O2t(EP_array), label = '$F4_{O2}$')
         ax6.set_xlabel("Time (min)")
         ax6.set_ylabel("Flow (kg/s)")
-        ax6.set_title("Flow in F6 and F4_O2 over time")
+        # ax6.set_title("Flow in F6 and F4_O2 over time")
         ax6.legend()
         plt.show(block=False)
-
-        dIdt = np.ones(self.t_arr.size-1)
-        for i in range(0, self.t_arr.size-1):
-            dIdt[i] = self.res[i+1,2] - self.res[i,2]
-        # ax7.plot(self.t_arr/60, self.res[:,2], label = 'Total error in rhoH2')
-        # ax7.plot(self.t_arr[:-1]/60, dIdt, label = 'Error in rhoH2')
-        # ax7.set_xlabel("Time (min)")
-        # ax7.set_ylabel("Flow (kg/s)")
-        # ax7.set_title("Error")
-        # plt.show(block=False)
-
-        # ax8.plot(self.t_arr/60, self.res[:,2]/abs(np.min(self.res[:,2])), label = 'Total error scaled')
-        # ax8.plot(self.t_arr[:-1]/60, dIdt*10/abs(np.min(self.res[:,2])), label = 'Error scaled')
-        # ax8.plot(self.t_arr[:-1]/60, F5_array/np.max(F5_array), label='F5 scaled')
-        # ax8.plot(self.t_arr/60, self.F3_H2t(EP_array)/np.max(F5_array), label = 'F3_H2 scaled')
-        # ax8.plot(self.t_arr/60, pH2_array/np.max(self.res[:,0]), label = 'PC1.SP scaled')
-        # ax8.plot(self.t_arr/60, self.res[:,0]/np.max(self.res[:,0]), label = 'PC1.PV scaled')
-        # ax8.legend()
-        # plt.show(block=False)
 
         print(f"\nNt: {self.t_arr.size:.2f}, tf: {self.t_arr[-1]/60:.2f} min, lmb: {self.lmb:.2f}")
         print(f"max F5: {np.max(F5_array):.5f}, min F5: {np.min(F5_array):.5f}, max change: ")
         print(self.SS.F6)
 
-    def plot_PIDgraphs_t(self):
+    def plot_PIDgraphs_t(self, Nt, tf):
 
         if self.pidt == 0:
             print("PID not yet calculated. Please take a break for a moment")
-            self.PID2()
+            self.PID2(Nt, tf)
 
         fig1, ax1 = plt.subplots()
         fig1.set_size_inches(16,8)
@@ -536,8 +551,8 @@ class dynmodel:
         fig3.set_size_inches(16,8)
         fig4, ax4 = plt.subplots()
         fig4.set_size_inches(16,8)
-        # fig5, ax5 = plt.subplots()
-        # fig5.set_size_inches(16,8)
+        fig5, ax5 = plt.subplots()
+        fig5.set_size_inches(16,8)
         # fig6, ax6 = plt.subplots()
         # fig6.set_size_inches(16,8)
 
@@ -546,18 +561,29 @@ class dynmodel:
             EP_array[i] = self.Ept(self.t_arr[i])
         ax1.plot(self.t_arr/60, EP_array, label = 'EP')
         ax1.set_xlabel("Time (min)")
-        ax1.set_ylabel("EP")
-        ax1.set_title("EP")
+        ax1.set_ylabel("Electrical power (kW)")
+        # ax1.set_title("EP")
         ax1.legend()
         plt.show(block=False)
 
+        Tdif = self.res[:,1]-self.res[:,0]
+
         ax2.plot(self.t_arr/60, self.res[:,0]-273.15, label='T1')
         ax2.plot(self.t_arr/60, self.res[:,1]-273.15, label='T3')
+        ax2.axvline(self.t_arr[np.argmax(Tdif)]/60, color='r', ls='--', label=f'Location of max(T3-T1)= {np.max(Tdif):.3f} C')
         ax2.set_xlabel("Time (min)")
         ax2.set_ylabel("Temperature (C)")
-        ax2.set_title("Temperature of T1 and T3 over time")
+        # ax2.set_title("Temperature of T1 and T3 over time")
         ax2.legend()
         plt.show(block=False)
+
+        # Step test
+        # ax2.plot(self.t_arr[2450:]/60, self.res[2450:,1]-273.15, label='T3')
+        # ax2.text(0,self.SS.T3,"{:.0f}".format(self.SS.T3))
+        # ax2.set_xlabel("Time (min)")
+        # ax2.set_ylabel("Temperature (C)")
+        # ax2.legend()
+        # plt.show(block=False)
 
         TC1_SP_array = np.zeros(self.t_arr.size)
         for i in range(0, self.t_arr.size):
@@ -566,7 +592,7 @@ class dynmodel:
         ax3.plot(self.t_arr/60, self.res[:,1]-273.15, label='TC1.PV')
         ax3.set_xlabel("Time (min)")
         ax3.set_ylabel("Temperature (C)")
-        ax3.set_title("TC1 Setpoint and TC1.PV over time")
+        # ax3.set_title("TC1 Setpoint and TC1.PV over time")
         ax3.legend()
         plt.show(block=False)
 
@@ -576,28 +602,16 @@ class dynmodel:
         ax4.plot(self.t_arr[:-1]/60, TSet-273.15, label='TCA.SP')
         ax4.set_xlabel("Time (min)")
         ax4.set_ylabel("Temperature (C)")
-        ax4.set_title("TCA.SP over time")
+        # ax4.set_title("TCA.SP over time")
         ax4.legend()
         plt.show(block=False)
 
-        # dIdt = np.ones(self.t_arr.size-1)
-        # for i in range(0, self.t_arr.size-1):
-        #     dIdt[i] = self.res[i+1,2] - self.res[i,2]
-        # ax5.plot(self.t_arr/60, self.res[:,2]/10, label='Total error/10')
-        # ax5.plot(self.t_arr[:-1]/60, dIdt, label='Error')
-        # ax5.set_xlabel("Time (min)")
-        # ax5.set_ylabel("Temperature (C)")
-        # ax5.set_title("Error over time")
-        # ax5.legend()
-        # plt.show(block=False)
-
-        # ax6.plot(self.t_arr/60, self.resivp.y[0]-273.15, label='T1')
-        # ax6.plot(self.t_arr/60, self.resivp.y[1]-273.15, label='T3')
-        # ax6.set_xlabel("Time (min)")
-        # ax6.set_ylabel("Temperature (C)")
-        # ax6.set_title("Temperature of T1 and T3 over time (Solve_IVP)")
-        # ax6.legend()
-        # plt.show(block=False)
+        F1_array = np.ones(self.t_arr.size)*(self.SS.F1_elec+self.SS.F2_elec+(EP_array-100)*(31/400))/2
+        ax5.plot(self.t_arr/60, F1_array, label = '$F1_{elec}$')
+        ax5.set_xlabel("Time (min)")
+        ax5.set_ylabel("Flow (kg/s)")
+        ax5.legend()
+        plt.show(block=False)
 
     def __str__(self):
         print(self.calc)
@@ -625,24 +639,24 @@ Results not yet calculated.
 '''
 
 # Uncomment to calculate and print steady state values (Question 6)    
-#EP = 500
-#S1 = SSt(EP, F1_elec, F2_elec, TCA_SP)
-#S1.calculate()
-#print(S1)
+# EP = 500
+# S1 = SSt(EP, F1_elec, F2_elec, TCA_SP)
+# S1.calculate()
+# print(S1)
 
 # Uncomment to calculate and plot dynamic simulation (Question 7)
-# S2 = dynmodel()
-# S2.plot_calcgraphs(5000, 200)
-# plt.show()
+S2 = dynmodel()
+S2.plot_calcgraphs(5000, 200)
+plt.show()
 
 # Uncomment to calculate and plot dynamic simulation with PI controllers for PC1 and PC2 (Question 8)
 # S2 = dynmodel()
-# S2.plot_PIDgraphs_p(1000,200)
+# S2.plot_PIDgraphs_p(5000, 200)
 # plt.show()
 
 # Uncomment to calculate and plot dynamic simulation with PI controller for TC1 (Question 9)
-S2 = dynmodel()
-S2.plot_PIDgraphs_t()
-plt.show()
+# S2 = dynmodel()
+# S2.plot_PIDgraphs_t(5000, 200) 
+# plt.show()
 
 
